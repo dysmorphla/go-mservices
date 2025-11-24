@@ -35,6 +35,6 @@ func New() (*App, error) {
 }
 
 func (a *App) Run() error {
-	fmt.Println("Auth service is running on : %s \n", a.cfg.HTTP.Port)
+	fmt.Printf("Auth service is running on : %s \n", a.cfg.HTTP.Port)
 	return a.httpServer.ListenAndServe()
 }
