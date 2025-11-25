@@ -5,5 +5,17 @@ import (
 )
 
 func PingHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("pong"))
+	w.Write([]byte("Response " + r.RemoteAddr))
+}
+
+func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func ResetHandler(w http.ResponseWriter, r *http.Request) {
+
 }
