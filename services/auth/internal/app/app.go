@@ -2,15 +2,18 @@ package app
 
 import (
 	"fmt"
-	nethttp "net/http"
+	"net/http"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ncundstnd/go-mservices/services/auth/internal/config"
-	deliveryhttp "github.com/ncundstnd/go-mservices/services/auth/internal/delivery"
+	servicehttp "github.com/ncundstnd/go-mservices/services/auth/internal/handlers"
+	"github.com/ncundstnd/go-mservices/services/auth/internal/repository"
 )
 
 type App struct {
-	httpServer *nethttp.Server
+	httpServer *http.Server
 	cfg        *config.Config
+	db         *pgxpool.Pool
 }
 
 func New() (*App, error) {
@@ -19,13 +22,18 @@ func New() (*App, error) {
 		return nil, err
 	}
 
-	//чё это бля
-	mux := nethttp.NewServeMux()
-	deliveryhttp.RegisterRoutes(mux)
+	db, err := repository.NewPostgres(cfg.Postgres)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init postgres: %w", err)
+	}
+
+	mux := http.NewServeMux()
+	servicehttp.RegisterRoutes(mux)
 
 	a := &App{
 		cfg: cfg,
-		httpServer: &nethttp.Server{
+		db:  db,
+		httpServer: &http.Server{
 			Addr:    ":" + cfg.HTTP.Port,
 			Handler: mux,
 		},

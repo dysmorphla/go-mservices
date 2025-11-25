@@ -1,4 +1,4 @@
-package http
+package servicehttp
 
 import (
 	"net/http"
@@ -6,4 +6,5 @@ import (
 
 func RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/ping", PingHandler)
+
 }

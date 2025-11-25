@@ -8,8 +8,18 @@ type HTTPConfig struct {
 	Port string `yaml:"port" env:"HTTP_PORT"`
 }
 
+type PostgresConfig struct {
+	Host     string `yaml:"host"`
+	Port     string `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	DBName   string `yaml:"dbname"`
+	SSLMode  string `yaml:"sslmode"`
+}
+
 type Config struct {
-	HTTP HTTPConfig `yaml:"http"`
+	HTTP     HTTPConfig     `yaml:"http"`
+	Postgres PostgresConfig `yaml:"postgres"`
 }
 
 func LoadConfig() (*Config, error) {
