@@ -27,8 +27,13 @@ func New() (*App, error) {
 		return nil, fmt.Errorf("failed to init postgres: %w", err)
 	}
 
+	userRepo := repository.NewUserRepository(db)
+	handler := &servicehttp.Handler{
+		UserRepo: userRepo,
+	}
+
 	mux := http.NewServeMux()
-	servicehttp.RegisterRoutes(mux)
+	servicehttp.RegisterRoutes(mux, handler)
 
 	a := &App{
 		cfg: cfg,
@@ -43,6 +48,6 @@ func New() (*App, error) {
 }
 
 func (a *App) Run() error {
-	fmt.Printf("Auth service is running on : %s \n", a.cfg.HTTP.Port)
+	fmt.Printf("Auth service is running on : %s\n", a.cfg.HTTP.Port)
 	return a.httpServer.ListenAndServe()
 }

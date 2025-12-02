@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: go-mservice
+      POSTGRES_DB: gomservice
     ports:
       - "5432:5432"
     volumes:
