@@ -8,10 +8,6 @@ func PingHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Response " + r.RemoteAddr))
 }
 
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func ResetHandler(w http.ResponseWriter, r *http.Request) {
+func RemoveHandler(w http.ResponseWriter, r *http.Request) {
 
 }

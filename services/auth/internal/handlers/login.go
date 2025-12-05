@@ -2,16 +2,17 @@ package servicehttp
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/mail"
 )
 
-type RegisterRequest struct {
+type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -30,12 +31,11 @@ func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := h.UserRepo.CreateUser(r.Context(), email.Address, req.Password)
+	user, err := h.UserRepo.GetUserByEmail(r.Context(), email.Address)
 	if err != nil {
-		http.Error(w, "failed to create user: "+err.Error(), http.StatusConflict)
+		http.Error(w, "failed to get user: "+err.Error(), http.StatusConflict)
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(`{"id":"` + userID + `"}`))
+	fmt.Printf(user.ID, user.Email, user.PasswordHash)
 }
