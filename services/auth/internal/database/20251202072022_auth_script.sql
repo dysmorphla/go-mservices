@@ -19,7 +19,7 @@ CREATE TABLE auth.refresh_tokens (
     user_id uuid NOT NULL,
     token text UNIQUE NOT NULL,
     expires_at timestamp NOT NULL,
-    created_at timestamp NOT NULL DEFAULT now(),
+    created_at timestamp NOT NULL,
 
     FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
@@ -29,7 +29,7 @@ CREATE TABLE auth.sessions (
     user_id uuid NOT NULL,
     user_agent text NOT NULL,
     ip text NOT NULL,
-    created_at timestamp NOT NULL DEFAULT now(),
+    created_at timestamp NOT NULL,
 
     FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 );
@@ -38,4 +38,9 @@ CREATE TABLE auth.sessions (
 -- +goose Down
 -- +goose StatementBegin
 SELECT 'down SQL query';
+
+DROP TABLE IF EXISTS auth.sessions;
+DROP TABLE IF EXISTS auth.refresh_tokens;
+DROP TABLE IF EXISTS auth.users;
+DROP SCHEMA IF EXISTS auth;
 -- +goose StatementEnd

@@ -78,3 +78,24 @@ func (r *UserRepository) DeleteUserByEmail(ctx context.Context, email string) er
 
 	return nil
 }
+
+func (r *UserRepository) CreateToken(ctx context.Context, id uuid.UUID, token string, expMinutes int) (uuid.UUID, error) {
+	var ID uuid.UUID
+
+	query := `
+		INSERT INTO auth.refresh_tokens (user_id, token, created_at, expires_at)
+		VALUES ($1, $2, NOW(), NOW() + ($3 || ' minutes')::interval)
+		RETURNING id;
+	`
+
+	err := r.db.QueryRow(ctx, query, id, token, expMinutes).Scan(&ID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return ID, nil
+}
+
+func (r *UserRepository) CreateSession(ctx context.Context) (uuid.UUID, error) {
+
+	return uuid.Nil, nil
+}

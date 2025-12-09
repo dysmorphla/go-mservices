@@ -30,6 +30,7 @@ func New() (*App, error) {
 	userRepo := repository.NewUserRepository(db)
 	handler := &servicehttp.Handler{
 		UserRepo: userRepo,
+		Cfg:      cfg,
 	}
 
 	mux := http.NewServeMux()

@@ -3,11 +3,13 @@ package servicehttp
 import (
 	"net/http"
 
+	"github.com/ncundstnd/go-mservices/services/auth/internal/config"
 	"github.com/ncundstnd/go-mservices/services/auth/internal/repository"
 )
 
 type Handler struct {
 	UserRepo *repository.UserRepository
+	Cfg      *config.Config
 }
 
 func RegisterRoutes(mux *http.ServeMux, h *Handler) {

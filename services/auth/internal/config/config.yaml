@@ -8,3 +8,7 @@ postgres:
   password: "postgres"
   dbname: "gomservice"
   sslmode: "disable"
+
+jwt:
+  secret: "supersecretkey"
+  exp_minutes: 1440

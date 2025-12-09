@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/mail"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/ncundstnd/go-mservices/services/auth/internal/config"
 	"github.com/ncundstnd/go-mservices/services/auth/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -38,4 +41,15 @@ func (h *Handler) CheckPassword(email string, password string, ctx context.Conte
 	}
 
 	return user, nil
+}
+
+func GenerateJWT(userID string, cfg *config.JWTConfig) (string, error) {
+	claims := jwt.MapClaims{
+		"user_id": userID,
+		"exp":     time.Now().Add(time.Minute * time.Duration(cfg.ExpMinutes)).Unix(),
+		"iat":     time.Now().Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(cfg.Secret))
 }
