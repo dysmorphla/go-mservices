@@ -5,7 +5,7 @@ import (
 	"net/http"
 )
 
-func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	var req RequestStruct
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -22,6 +22,12 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	user, err := h.CheckPassword(email.Address, req.Password, r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	err = h.UserRepo.DeleteUserByEmail(r.Context(), email.Address)
+	if err != nil {
+		http.Error(w, "failed delete user: "+err.Error(), http.StatusConflict)
 		return
 	}
 

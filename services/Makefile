@@ -1,5 +1,7 @@
 # build-auth:
 # 	go build -C ./auth -o bin/auth.exe .
+build-auth:
+	go build -C ./auth -o bin/auth.exe .
 
-run-auth:
-	go run -C ./auth ./main.go
+run-auth: build-auth
+	.\auth\bin\auth.exe

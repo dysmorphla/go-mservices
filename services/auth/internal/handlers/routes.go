@@ -11,9 +11,7 @@ type Handler struct {
 }
 
 func RegisterRoutes(mux *http.ServeMux, h *Handler) {
-	mux.HandleFunc("/ping", PingHandler)
 	mux.HandleFunc("POST /register", h.RegisterHandler)
 	mux.HandleFunc("POST /login", h.LoginHandler)
-	mux.HandleFunc("POST /remove", RemoveHandler)
-
+	mux.HandleFunc("DELETE /delete", h.DeleteHandler)
 }

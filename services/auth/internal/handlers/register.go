@@ -3,39 +3,36 @@ package servicehttp
 import (
 	"encoding/json"
 	"net/http"
-	"net/mail"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
-type RegisterRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
 func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
-	var req RegisterRequest
+	var req RequestStruct
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	if req.Email == "" || req.Password == "" {
-		http.Error(w, "email and password required", http.StatusBadRequest)
-		return
-	}
-
-	email, err := mail.ParseAddress(req.Email)
+	email, err := ValidateEmailAndPassword(req)
 	if err != nil {
-		http.Error(w, "email incorrect", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
-	userID, err := h.UserRepo.CreateUser(r.Context(), email.Address, req.Password)
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	userID, err := h.UserRepo.CreateUser(r.Context(), email.Address, string(passwordHash))
 	if err != nil {
 		http.Error(w, "failed to create user: "+err.Error(), http.StatusConflict)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(`{"id":"` + userID + `"}`))
+	w.Write([]byte(`{"id":"` + userID.String() + `"}`))
 }

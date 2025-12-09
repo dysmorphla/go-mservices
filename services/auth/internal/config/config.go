@@ -25,7 +25,7 @@ type Config struct {
 func LoadConfig() (*Config, error) {
 	cfg := &Config{}
 
-	if err := cleanenv.ReadConfig("./internal/config/config.yaml", cfg); err != nil {
+	if err := cleanenv.ReadConfig("./auth/internal/config/config.yaml", cfg); err != nil {
 		return nil, err
 	}
 
