@@ -16,4 +16,6 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler) {
 	mux.HandleFunc("POST /register", h.RegisterHandler)
 	mux.HandleFunc("POST /login", h.LoginHandler)
 	mux.HandleFunc("DELETE /delete", h.DeleteHandler)
+	//POST /refresh
+	//POST /logout
 }

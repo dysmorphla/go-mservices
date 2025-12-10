@@ -2,6 +2,8 @@ package servicehttp
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net/mail"
 	"time"
@@ -52,4 +54,18 @@ func GenerateJWT(userID string, cfg *config.JWTConfig) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(cfg.Secret))
+}
+
+func GenerateRefreshToken() (string, error) {
+	bytes := make([]byte, 32)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(bytes), nil
+}
+
+func CompareRefreshTokens() {
+
 }

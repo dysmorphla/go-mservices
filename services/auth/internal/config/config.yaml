@@ -11,4 +11,4 @@ postgres:
 
 jwt:
   secret: "supersecretkey"
-  exp_minutes: 1440
+  exp_minutes: 30

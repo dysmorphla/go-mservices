@@ -14,16 +14,6 @@ CREATE TABLE auth.users (
     updated_at timestamp NOT NULL DEFAULT now()
 );
 
-CREATE TABLE auth.refresh_tokens (
-    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id uuid NOT NULL,
-    token text UNIQUE NOT NULL,
-    expires_at timestamp NOT NULL,
-    created_at timestamp NOT NULL,
-
-    FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
-);
-
 CREATE TABLE auth.sessions (
     id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id uuid NOT NULL,
@@ -32,6 +22,16 @@ CREATE TABLE auth.sessions (
     created_at timestamp NOT NULL,
 
     FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE auth.refresh_tokens (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    session_id uuid NOT NULL,
+    token text UNIQUE NOT NULL,
+    expires_at timestamp NOT NULL,
+    created_at timestamp NOT NULL,
+
+    FOREIGN KEY (session_id) REFERENCES auth.sessions(id) ON DELETE CASCADE
 );
 -- +goose StatementEnd
 

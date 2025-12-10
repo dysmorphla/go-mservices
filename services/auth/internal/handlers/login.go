@@ -25,20 +25,34 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := GenerateJWT(user.ID.String(), &h.Cfg.JWT)
+	refreshToken, err := GenerateRefreshToken()
 	if err != nil {
-		http.Error(w, "failed to generate token", http.StatusInternalServerError)
+		http.Error(w, "failed to generate refresh token", http.StatusInternalServerError)
 		return
 	}
 
-	//Подумать над временем
-	tokenID, err := h.UserRepo.CreateToken(r.Context(), user.ID, token, 1440)
+	accessToken, err := GenerateJWT(user.ID.String(), &h.Cfg.JWT)
+	if err != nil {
+		http.Error(w, "failed to generate access token", http.StatusInternalServerError)
+		return
+	}
+
+	//Подумать
+	_, err = h.UserRepo.CreateRefreshToken(r.Context(), user.ID, refreshToken, 14)
 	if err != nil {
 		http.Error(w, "failed to save refresh token", http.StatusInternalServerError)
 		return
 	}
 
+	resp := struct {
+		AcceccToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+	}{
+		AcceccToken:  accessToken,
+		RefreshToken: refreshToken,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(tokenID)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(resp)
 }
