@@ -2,11 +2,16 @@ package servicehttp
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req RequestStruct
+	req.IP, _, _ = net.SplitHostPort(r.RemoteAddr)
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -25,34 +30,32 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	refreshToken, err := GenerateRefreshToken()
-	if err != nil {
-		http.Error(w, "failed to generate refresh token", http.StatusInternalServerError)
+	session, err := h.UserRepo.GetExistingSession(r.Context(), user.ID, r.UserAgent(), req.IP)
+	if err != nil && err != pgx.ErrNoRows {
+		http.Error(w, "session lookup failed", http.StatusInternalServerError)
 		return
 	}
 
-	accessToken, err := GenerateJWT(user.ID.String(), &h.Cfg.JWT)
-	if err != nil {
-		http.Error(w, "failed to generate access token", http.StatusInternalServerError)
-		return
+	var sessionID uuid.UUID
+
+	if session != nil {
+		sessionID = session.ID
+	} else {
+		sessionID, err = h.UserRepo.CreateSession(r.Context(), user.ID, r.UserAgent(), req.IP)
+		if err != nil {
+			http.Error(w, "failed to create session", http.StatusInternalServerError)
+			return
+		}
 	}
 
-	//Подумать
-	_, err = h.UserRepo.CreateRefreshToken(r.Context(), user.ID, refreshToken, 14)
+	tokens, err := h.issueTokens(r.Context(), user.ID, sessionID)
 	if err != nil {
-		http.Error(w, "failed to save refresh token", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-
-	resp := struct {
-		AcceccToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-	}{
-		AcceccToken:  accessToken,
-		RefreshToken: refreshToken,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(tokens)
+
 }

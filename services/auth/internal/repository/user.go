@@ -19,9 +19,16 @@ func NewUserRepository(db *pgxpool.Pool) *UserRepository {
 }
 
 type User struct {
+	ID           uuid.UUID
 	Email        string
 	PasswordHash string
-	ID           uuid.UUID
+}
+
+type Session struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	UserAgent string
+	IP        string
 }
 
 func (r *UserRepository) CreateUser(ctx context.Context, email, passwordHash string) (uuid.UUID, error) {
@@ -46,7 +53,7 @@ func (r *UserRepository) CreateUser(ctx context.Context, email, passwordHash str
 	return ID, nil
 }
 
-func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+func (r *UserRepository) GetUser(ctx context.Context, email string) (*User, error) {
 	user := &User{}
 
 	query := `
@@ -65,7 +72,7 @@ func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*Use
 	return user, nil
 }
 
-func (r *UserRepository) DeleteUserByEmail(ctx context.Context, email string) error {
+func (r *UserRepository) DeleteUser(ctx context.Context, email string) error {
 	query := `DELETE FROM auth.users WHERE email = $1`
 	cmdTag, err := r.db.Exec(ctx, query, email)
 	if err != nil {
@@ -79,11 +86,56 @@ func (r *UserRepository) DeleteUserByEmail(ctx context.Context, email string) er
 	return nil
 }
 
+func (r *UserRepository) CreateSession(ctx context.Context, id uuid.UUID, userAgent string, ip string) (uuid.UUID, error) {
+	var ID uuid.UUID
+
+	query := `
+		INSERT INTO auth.sessions(
+		user_id, user_agent, ip, created_at)
+		VALUES ($1, $2, $3, NOW())
+		RETURNING id;
+	`
+
+	err := r.db.QueryRow(ctx, query, id, userAgent, ip).Scan(&ID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	return ID, nil
+}
+
+func (r *UserRepository) GetExistingSession(ctx context.Context, userID uuid.UUID, userAgent, ip string) (*Session, error) {
+	session := &Session{}
+
+	query := `
+			SELECT id, user_id, user_agent, ip
+			FROM auth.sessions
+			WHERE user_id=$1 AND user_agent=$2 AND ip=$3
+			LIMIT 1;
+		`
+
+	err := r.db.QueryRow(ctx, query, userID, userAgent, ip).Scan(
+		&session.ID, &session.UserID, &session.UserAgent, &session.IP,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
+func (r *UserRepository) DeleteSession(ctx context.Context, id uuid.UUID, userAgent string, ip string) (uuid.UUID, error) {
+	var ID uuid.UUID
+
+	return ID, nil
+}
+
 func (r *UserRepository) CreateRefreshToken(ctx context.Context, id uuid.UUID, refreshToken string, expDays int) (uuid.UUID, error) {
 	var ID uuid.UUID
 
 	query := `
-		INSERT INTO auth.refresh_tokens (user_id, token, created_at, expires_at)
+		INSERT INTO auth.refresh_tokens (session_id, token, created_at, expires_at)
 		VALUES ($1, $2, NOW(), NOW() + ($3 * INTERVAL '1 day'))
 		RETURNING id;
 	`
@@ -95,7 +147,8 @@ func (r *UserRepository) CreateRefreshToken(ctx context.Context, id uuid.UUID, r
 	return ID, nil
 }
 
-func (r *UserRepository) CreateSession(ctx context.Context) (uuid.UUID, error) {
+func (r *UserRepository) UpdateRefreshToken(ctx context.Context, id uuid.UUID, refreshToken string, expDays int) (uuid.UUID, error) {
+	var ID uuid.UUID
 
-	return uuid.Nil, nil
+	return ID, nil
 }

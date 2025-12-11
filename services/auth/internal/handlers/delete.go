@@ -25,7 +25,7 @@ func (h *Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = h.UserRepo.DeleteUserByEmail(r.Context(), email.Address)
+	err = h.UserRepo.DeleteUser(r.Context(), email.Address)
 	if err != nil {
 		http.Error(w, "failed delete user: "+err.Error(), http.StatusConflict)
 		return
