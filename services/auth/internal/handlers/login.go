@@ -46,6 +46,7 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to create session", http.StatusInternalServerError)
 			return
 		}
+
 	}
 
 	tokens, err := h.issueTokens(r.Context(), user.ID, sessionID)

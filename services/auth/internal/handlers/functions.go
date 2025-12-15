@@ -39,7 +39,7 @@ func ValidateEmailAndPassword(req RequestStruct) (*mail.Address, error) {
 	return email, nil
 }
 
-func (h *Handler) CheckPassword(email string, password string, ctx context.Context) (*repository.User, error) {
+func (h *Handler) CheckPassword(email, password string, ctx context.Context) (*repository.User, error) {
 	user, err := h.UserRepo.GetUser(ctx, email)
 	if err != nil {
 		return nil, err
@@ -52,11 +52,12 @@ func (h *Handler) CheckPassword(email string, password string, ctx context.Conte
 	return user, nil
 }
 
-func GenerateJWT(userID string, cfg *config.JWTConfig) (string, error) {
+func GenerateJWT(userID, sessionID string, cfg *config.JWTConfig) (string, error) {
 	claims := jwt.MapClaims{
-		"user_id": userID,
-		"exp":     time.Now().Add(time.Minute * time.Duration(cfg.ExpMinutes)).Unix(),
-		"iat":     time.Now().Unix(),
+		"user_id":    userID,
+		"session_id": sessionID,
+		"exp":        time.Now().Add(time.Minute * time.Duration(cfg.ExpMinutes)).Unix(),
+		"iat":        time.Now().Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -73,17 +74,13 @@ func GenerateRefreshToken() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-func CompareRefreshTokens() {
-
-}
-
-func (h *Handler) issueTokens(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID) (*TokenPair, error) {
+func (h *Handler) issueTokens(ctx context.Context, userID, sessionID uuid.UUID) (*TokenPair, error) {
 	refreshToken, err := GenerateRefreshToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
 	}
 
-	accessToken, err := GenerateJWT(userID.String(), &h.Cfg.JWT)
+	accessToken, err := GenerateJWT(userID.String(), sessionID.String(), &h.Cfg.JWT)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}
