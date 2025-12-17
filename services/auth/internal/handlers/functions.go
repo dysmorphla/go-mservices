@@ -74,7 +74,7 @@ func GenerateRefreshToken() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-func (h *Handler) issueTokens(ctx context.Context, userID, sessionID uuid.UUID) (*TokenPair, error) {
+func (h *Handler) IssueNewTokens(ctx context.Context, userID, sessionID uuid.UUID) (*TokenPair, error) {
 	refreshToken, err := GenerateRefreshToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate refresh token: %w", err)

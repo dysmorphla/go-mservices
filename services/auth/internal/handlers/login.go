@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -36,20 +35,18 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var sessionID uuid.UUID
-
 	if session != nil {
-		sessionID = session.ID
-	} else {
-		sessionID, err = h.UserRepo.CreateSession(r.Context(), user.ID, r.UserAgent(), req.IP)
-		if err != nil {
-			http.Error(w, "failed to create session", http.StatusInternalServerError)
-			return
-		}
-
+		_ = h.UserRepo.RevokeSession(r.Context(), session.ID)
+		_ = h.UserRepo.RevokeRefreshTokenBySession(r.Context(), session.ID)
 	}
 
-	tokens, err := h.issueTokens(r.Context(), user.ID, sessionID)
+	sessionID, err := h.UserRepo.CreateSession(r.Context(), user.ID, r.UserAgent(), req.IP)
+	if err != nil {
+		http.Error(w, "failed to create session", http.StatusInternalServerError)
+		return
+	}
+
+	tokens, err := h.IssueNewTokens(r.Context(), user.ID, sessionID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -58,5 +55,4 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(tokens)
-
 }

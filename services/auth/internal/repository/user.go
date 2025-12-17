@@ -86,13 +86,15 @@ func (r *UserRepository) DeleteUser(ctx context.Context, email string) error {
 	return nil
 }
 
+//
+
 func (r *UserRepository) GetExistingSession(ctx context.Context, userID uuid.UUID, userAgent, ip string) (*Session, error) {
 	session := &Session{}
 
 	query := `
 		SELECT id, user_id, user_agent, ip
 		FROM auth.sessions
-		WHERE user_id=$1 AND user_agent=$2 AND ip=$3
+		WHERE user_id=$1 AND user_agent=$2 AND ip=$3 AND revoked_at IS NULL
 		LIMIT 1;
 	`
 
@@ -130,11 +132,7 @@ func (r *UserRepository) RevokeSession(ctx context.Context, sessionID uuid.UUID)
 		UPDATE auth.sessions
 		SET revoked_at = NOW()
 		WHERE id = $1
-		  AND revoked_at IS NULL;
-
-		UPDATE auth.refresh_tokens
-		SET revoked_at = NOW()
-		WHERE session_id = $1;
+		  	AND revoked_at IS NULL;
 	`
 
 	cmd, err := r.db.Exec(ctx, query, sessionID)
@@ -148,6 +146,8 @@ func (r *UserRepository) RevokeSession(ctx context.Context, sessionID uuid.UUID)
 
 	return nil
 }
+
+//
 
 func (r *UserRepository) CreateRefreshToken(ctx context.Context, id uuid.UUID, refreshToken string, expDays int) (uuid.UUID, error) {
 	var ID uuid.UUID
@@ -174,6 +174,26 @@ func (r *UserRepository) RevokeRefreshToken(ctx context.Context, token string) e
 	`
 
 	cmd, err := r.db.Exec(ctx, query, token)
+	if err != nil {
+		return err
+	}
+
+	if cmd.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+
+	return nil
+}
+
+func (r *UserRepository) RevokeRefreshTokenBySession(ctx context.Context, id uuid.UUID) error {
+	query := `
+		UPDATE auth.refresh_tokens
+		SET revoked_at = NOW()
+		WHERE session_id = $1
+			AND revoked_at IS NULL;
+	`
+
+	cmd, err := r.db.Exec(ctx, query, id)
 	if err != nil {
 		return err
 	}
