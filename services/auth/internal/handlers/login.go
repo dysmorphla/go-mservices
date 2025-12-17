@@ -23,7 +23,13 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.CheckPassword(email.Address, req.Password, r.Context())
+	user, err := h.UserRepo.GetUserByEmail(r.Context(), email.Address)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	err = CheckPasswordHash(user.PasswordHash, req.Password)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return

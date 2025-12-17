@@ -10,8 +10,8 @@ CREATE TABLE auth.users (
     id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     email text UNIQUE NOT NULL,
     password_hash text NOT NULL,
-    created_at timestamp NOT NULL DEFAULT now(),
-    updated_at timestamp NOT NULL DEFAULT now()
+    created_at timestamp NOT NULL,
+    deleted_at timestamp DEFAULT NULL
 );
 
 CREATE TABLE auth.sessions (

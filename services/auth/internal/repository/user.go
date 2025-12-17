@@ -35,8 +35,8 @@ func (r *UserRepository) CreateUser(ctx context.Context, email, passwordHash str
 	var ID uuid.UUID
 
 	query := `
-        INSERT INTO auth.users (email, password_hash, created_at, updated_at)
-        VALUES ($1, $2, NOW(), NOW())
+        INSERT INTO auth.users (email, password_hash, created_at)
+        VALUES ($1, $2, NOW())
         RETURNING id;
     `
 
@@ -53,13 +53,14 @@ func (r *UserRepository) CreateUser(ctx context.Context, email, passwordHash str
 	return ID, nil
 }
 
-func (r *UserRepository) GetUser(ctx context.Context, email string) (*User, error) {
+func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	user := &User{}
 
 	query := `
         SELECT id, email, password_hash
         FROM auth.users
-        WHERE email = $1
+		WHERE email = $1
+  			AND deleted_at IS NULL
     `
 
 	err := r.db.QueryRow(ctx, query, email).Scan(&user.ID, &user.Email, &user.PasswordHash)
@@ -72,21 +73,65 @@ func (r *UserRepository) GetUser(ctx context.Context, email string) (*User, erro
 	return user, nil
 }
 
-func (r *UserRepository) DeleteUser(ctx context.Context, email string) error {
-	query := `DELETE FROM auth.users WHERE email = $1`
-	cmdTag, err := r.db.Exec(ctx, query, email)
+func (r *UserRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*User, error) {
+	user := &User{}
+
+	query := `
+        SELECT id, email, password_hash
+        FROM auth.users
+		WHERE id = $1
+  			AND deleted_at IS NULL
+    `
+
+	err := r.db.QueryRow(ctx, query, id).Scan(&user.ID, &user.Email, &user.PasswordHash)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("user not found")
+		}
+		return nil, err
+	}
+	return user, nil
+}
+
+func (r *UserRepository) DeleteUser(ctx context.Context, userID uuid.UUID) error {
+	query := `
+		UPDATE auth.users
+		SET deleted_at = NOW()
+		WHERE id = $1
+			AND deleted_at IS NULL;
+	`
+
+	cmd, err := r.db.Exec(ctx, query, userID)
 	if err != nil {
 		return err
 	}
 
-	if cmdTag.RowsAffected() == 0 {
-		return errors.New("user not found")
+	if cmd.RowsAffected() == 0 {
+		return errors.New("user not found or already deleted")
 	}
 
 	return nil
 }
 
 //
+
+func (r *UserRepository) CreateSession(ctx context.Context, id uuid.UUID, userAgent, ip string) (uuid.UUID, error) {
+	var ID uuid.UUID
+
+	query := `
+		INSERT INTO auth.sessions(
+		user_id, user_agent, ip, created_at)
+		VALUES ($1, $2, $3, NOW())
+		RETURNING id;
+	`
+
+	err := r.db.QueryRow(ctx, query, id, userAgent, ip).Scan(&ID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	return ID, nil
+}
 
 func (r *UserRepository) GetExistingSession(ctx context.Context, userID uuid.UUID, userAgent, ip string) (*Session, error) {
 	session := &Session{}
@@ -109,22 +154,20 @@ func (r *UserRepository) GetExistingSession(ctx context.Context, userID uuid.UUI
 	return session, nil
 }
 
-func (r *UserRepository) CreateSession(ctx context.Context, id uuid.UUID, userAgent, ip string) (uuid.UUID, error) {
-	var ID uuid.UUID
+func (r *UserRepository) IsSessionActive(ctx context.Context, sessionID uuid.UUID) (bool, error) {
+	var active bool
 
 	query := `
-		INSERT INTO auth.sessions(
-		user_id, user_agent, ip, created_at)
-		VALUES ($1, $2, $3, NOW())
-		RETURNING id;
+		SELECT EXISTS (
+			SELECT 1
+			FROM auth.sessions
+			WHERE id = $1
+			  AND revoked_at IS NULL
+		);
 	`
 
-	err := r.db.QueryRow(ctx, query, id, userAgent, ip).Scan(&ID)
-	if err != nil {
-		return uuid.Nil, err
-	}
-
-	return ID, nil
+	err := r.db.QueryRow(ctx, query, sessionID).Scan(&active)
+	return active, err
 }
 
 func (r *UserRepository) RevokeSession(ctx context.Context, sessionID uuid.UUID) error {
@@ -145,6 +188,17 @@ func (r *UserRepository) RevokeSession(ctx context.Context, sessionID uuid.UUID)
 	}
 
 	return nil
+}
+
+func (r *UserRepository) RevokeAllSessions(ctx context.Context, userID uuid.UUID) error {
+	query := `
+		UPDATE auth.sessions
+		SET revoked_at = NOW()
+		WHERE user_id = $1
+		  AND revoked_at IS NULL;
+	`
+	_, err := r.db.Exec(ctx, query, userID)
+	return err
 }
 
 //
@@ -203,4 +257,17 @@ func (r *UserRepository) RevokeRefreshTokenBySession(ctx context.Context, id uui
 	}
 
 	return nil
+}
+
+func (r *UserRepository) RevokeAllRefreshTokens(ctx context.Context, userID uuid.UUID) error {
+	query := `
+		UPDATE auth.refresh_tokens rt
+		SET revoked_at = NOW()
+		FROM auth.sessions s
+		WHERE s.user_id = $1
+		  AND rt.session_id = s.id
+		  AND rt.revoked_at IS NULL;
+	`
+	_, err := r.db.Exec(ctx, query, userID)
+	return err
 }

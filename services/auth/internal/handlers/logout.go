@@ -17,32 +17,32 @@ func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 
 	tokenStr := cookie.Value
 
-	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
-		return []byte(h.Cfg.JWT.Secret), nil
-	})
+	claims := &Claims{}
+	token, err := jwt.ParseWithClaims(
+		tokenStr,
+		claims,
+		func(token *jwt.Token) (any, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, errors.New("unexpected signing method")
+			}
+			return []byte(h.Cfg.JWT.Secret), nil
+		},
+	)
 
 	if err != nil || !token.Valid {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
+	sessionID, _ := uuid.Parse(claims.SessionID)
 
-	sessionIDStr, ok := claims["session_id"].(string)
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	sessionID, err := uuid.Parse(sessionIDStr)
+	active, err := h.UserRepo.IsSessionActive(r.Context(), sessionID)
 	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if !active {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/mail"
 	"time"
@@ -11,7 +12,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/ncundstnd/go-mservices/services/auth/internal/config"
-	"github.com/ncundstnd/go-mservices/services/auth/internal/repository"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -24,6 +24,12 @@ type RequestStruct struct {
 type TokenPair struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
+}
+
+type Claims struct {
+	SessionID string `json:"session_id"`
+	UserID    string `json:"user_id"`
+	jwt.RegisteredClaims
 }
 
 func ValidateEmailAndPassword(req RequestStruct) (*mail.Address, error) {
@@ -39,25 +45,26 @@ func ValidateEmailAndPassword(req RequestStruct) (*mail.Address, error) {
 	return email, nil
 }
 
-func (h *Handler) CheckPassword(email, password string, ctx context.Context) (*repository.User, error) {
-	user, err := h.UserRepo.GetUser(ctx, email)
-	if err != nil {
-		return nil, err
+func CheckPasswordHash(hash, password string) error {
+	if err := bcrypt.CompareHashAndPassword(
+		[]byte(hash),
+		[]byte(password),
+	); err != nil {
+		return errors.New("invalid credentials")
 	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return nil, fmt.Errorf("invalid credentials")
-	}
-
-	return user, nil
+	return nil
 }
 
 func GenerateJWT(userID, sessionID string, cfg *config.JWTConfig) (string, error) {
-	claims := jwt.MapClaims{
-		"user_id":    userID,
-		"session_id": sessionID,
-		"exp":        time.Now().Add(time.Minute * time.Duration(cfg.ExpMinutes)).Unix(),
-		"iat":        time.Now().Unix(),
+	claims := Claims{
+		UserID:    userID,
+		SessionID: sessionID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(
+				time.Now().Add(time.Minute * time.Duration(cfg.ExpMinutes)),
+			),
+			IssuedAt: jwt.NewNumericDate(time.Now()),
+		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
