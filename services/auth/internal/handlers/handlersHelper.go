@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/mail"
 	"time"
 
@@ -32,7 +33,54 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func ValidateEmailAndPassword(req RequestStruct) (*mail.Address, error) {
+var (
+	ErrUnauthorized = errors.New("unauthorized")
+	ErrForbidden    = errors.New("forbidden")
+	ErrConflict     = errors.New("conflict")
+	ErrBadRequest   = errors.New("bad request")
+)
+
+func respondError(w http.ResponseWriter, err error) {
+	switch err {
+	case ErrBadRequest:
+		http.Error(w, "bad request", http.StatusBadRequest)
+	case ErrUnauthorized:
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	case ErrForbidden:
+		http.Error(w, "forbidden", http.StatusForbidden)
+	case ErrConflict:
+		http.Error(w, "conflict", http.StatusConflict)
+	default:
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	}
+}
+
+func (h *Handler) parseAccessToken(r *http.Request) (*Claims, error) {
+	cookie, err := r.Cookie("access_token")
+	if err != nil {
+		return nil, ErrUnauthorized
+	}
+
+	claims := &Claims{}
+	token, err := jwt.ParseWithClaims(
+		cookie.Value,
+		claims,
+		func(token *jwt.Token) (any, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, ErrUnauthorized
+			}
+			return []byte(h.Cfg.JWT.Secret), nil
+		},
+	)
+
+	if err != nil || !token.Valid {
+		return nil, ErrUnauthorized
+	}
+
+	return claims, nil
+}
+
+func validateEmailAndPassword(req RequestStruct) (*mail.Address, error) {
 	if req.Email == "" || req.Password == "" {
 		return nil, fmt.Errorf("email and password required")
 	}
@@ -45,7 +93,7 @@ func ValidateEmailAndPassword(req RequestStruct) (*mail.Address, error) {
 	return email, nil
 }
 
-func CheckPasswordHash(hash, password string) error {
+func checkPasswordHash(hash, password string) error {
 	if err := bcrypt.CompareHashAndPassword(
 		[]byte(hash),
 		[]byte(password),
@@ -55,7 +103,7 @@ func CheckPasswordHash(hash, password string) error {
 	return nil
 }
 
-func GenerateJWT(userID, sessionID string, cfg *config.JWTConfig) (string, error) {
+func generateJWT(userID, sessionID string, cfg *config.JWTConfig) (string, error) {
 	claims := Claims{
 		UserID:    userID,
 		SessionID: sessionID,
@@ -71,7 +119,7 @@ func GenerateJWT(userID, sessionID string, cfg *config.JWTConfig) (string, error
 	return token.SignedString([]byte(cfg.Secret))
 }
 
-func GenerateRefreshToken() (string, error) {
+func generateRefreshToken() (string, error) {
 	bytes := make([]byte, 32)
 	_, err := rand.Read(bytes)
 	if err != nil {
@@ -81,13 +129,13 @@ func GenerateRefreshToken() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-func (h *Handler) IssueNewTokens(ctx context.Context, userID, sessionID uuid.UUID) (*TokenPair, error) {
-	refreshToken, err := GenerateRefreshToken()
+func (h *Handler) issueNewTokens(ctx context.Context, userID, sessionID uuid.UUID) (*TokenPair, error) {
+	refreshToken, err := generateRefreshToken()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate refresh token: %w", err)
 	}
 
-	accessToken, err := GenerateJWT(userID.String(), sessionID.String(), &h.Cfg.JWT)
+	accessToken, err := generateJWT(userID.String(), sessionID.String(), &h.Cfg.JWT)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate access token: %w", err)
 	}

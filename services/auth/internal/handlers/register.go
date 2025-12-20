@@ -11,28 +11,30 @@ func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var req RequestStruct
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		respondError(w, ErrBadRequest)
 		return
 	}
 
-	email, err := ValidateEmailAndPassword(req)
+	email, err := validateEmailAndPassword(req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
+		respondError(w, ErrBadRequest)
 		return
 	}
 
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		respondError(w, nil)
 		return
 	}
 
-	userID, err := h.UserRepo.CreateUser(r.Context(), email.Address, string(passwordHash))
+	userID, err := h.UserRepo.CreateUser(r.Context(), email.Address, string(hash))
 	if err != nil {
-		http.Error(w, "failed to create user: "+err.Error(), http.StatusConflict)
+		respondError(w, ErrConflict)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(`{"id":"` + userID.String() + `"}`))
+	json.NewEncoder(w).Encode(map[string]string{
+		"id": userID.String(),
+	})
 }

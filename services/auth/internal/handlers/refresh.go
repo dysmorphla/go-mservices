@@ -9,43 +9,35 @@ import (
 func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("refresh_token")
 	if err != nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		respondError(w, ErrUnauthorized)
 		return
 	}
 
-	refreshToken := cookie.Value
-
-	rt, err := h.UserRepo.GetRefreshToken(r.Context(), refreshToken)
-	if err != nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	if rt.RevokedAt != nil || time.Now().After(rt.ExpiresAt) {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	rt, err := h.UserRepo.GetRefreshToken(r.Context(), cookie.Value)
+	if err != nil || rt.RevokedAt != nil || time.Now().After(rt.ExpiresAt) {
+		respondError(w, ErrUnauthorized)
 		return
 	}
 
 	active, err := h.UserRepo.IsSessionActive(r.Context(), rt.SessionID)
 	if err != nil || !active {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		respondError(w, ErrUnauthorized)
 		return
 	}
 
-	_ = h.UserRepo.RevokeRefreshToken(r.Context(), refreshToken)
+	_ = h.UserRepo.RevokeRefreshToken(r.Context(), cookie.Value)
 
 	userID, err := h.UserRepo.GetUserIDBySession(r.Context(), rt.SessionID)
 	if err != nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		respondError(w, ErrUnauthorized)
 		return
 	}
 
-	tokens, err := h.IssueNewTokens(r.Context(), userID, rt.SessionID)
+	tokens, err := h.issueNewTokens(r.Context(), userID, rt.SessionID)
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		respondError(w, nil)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tokens)
 }
