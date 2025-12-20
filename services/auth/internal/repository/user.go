@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -29,6 +30,14 @@ type Session struct {
 	UserID    uuid.UUID
 	UserAgent string
 	IP        string
+}
+
+type RefreshToken struct {
+	ID        uuid.UUID
+	SessionID uuid.UUID
+	Token     string
+	ExpiresAt time.Time
+	RevokedAt *time.Time
 }
 
 func (r *UserRepository) CreateUser(ctx context.Context, email, passwordHash string) (uuid.UUID, error) {
@@ -93,6 +102,27 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*User, 
 	return user, nil
 }
 
+func (r *UserRepository) GetUserIDBySession(ctx context.Context, sessionID uuid.UUID) (uuid.UUID, error) {
+	var userID uuid.UUID
+
+	query := `
+		SELECT user_id
+		FROM auth.sessions
+		WHERE id = $1
+		  AND revoked_at IS NULL
+	`
+
+	err := r.db.QueryRow(ctx, query, sessionID).Scan(&userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, errors.New("session not found or revoked")
+		}
+		return uuid.Nil, err
+	}
+
+	return userID, nil
+}
+
 func (r *UserRepository) DeleteUser(ctx context.Context, userID uuid.UUID) error {
 	query := `
 		UPDATE auth.users
@@ -133,7 +163,7 @@ func (r *UserRepository) CreateSession(ctx context.Context, id uuid.UUID, userAg
 	return ID, nil
 }
 
-func (r *UserRepository) GetExistingSession(ctx context.Context, userID uuid.UUID, userAgent, ip string) (*Session, error) {
+func (r *UserRepository) GetSession(ctx context.Context, userID uuid.UUID, userAgent, ip string) (*Session, error) {
 	session := &Session{}
 
 	query := `
@@ -217,6 +247,27 @@ func (r *UserRepository) CreateRefreshToken(ctx context.Context, id uuid.UUID, r
 		return uuid.Nil, err
 	}
 	return ID, nil
+}
+
+func (r *UserRepository) GetRefreshToken(ctx context.Context, token string) (*RefreshToken, error) {
+	rt := &RefreshToken{}
+
+	query := `
+		SELECT id, session_id, token, expires_at, revoked_at
+		FROM auth.refresh_tokens
+		WHERE token = $1
+		LIMIT 1;
+	`
+
+	err := r.db.QueryRow(ctx, query, token).Scan(&rt.ID, &rt.SessionID, &rt.Token, &rt.ExpiresAt, &rt.RevokedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("refresh token not found")
+		}
+		return nil, err
+	}
+
+	return rt, nil
 }
 
 func (r *UserRepository) RevokeRefreshToken(ctx context.Context, token string) error {

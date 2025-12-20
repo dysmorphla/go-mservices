@@ -35,7 +35,7 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := h.UserRepo.GetExistingSession(r.Context(), user.ID, r.UserAgent(), req.IP)
+	session, err := h.UserRepo.GetSession(r.Context(), user.ID, r.UserAgent(), req.IP)
 	if err != nil && err != pgx.ErrNoRows {
 		http.Error(w, "session lookup failed", http.StatusInternalServerError)
 		return
